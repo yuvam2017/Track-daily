@@ -225,9 +225,12 @@ body {
 .hist-day-line {
   display: flex; justify-content: space-between;
   font-size: 13px;
-  padding: 4px 0;
+  padding: 6px 4px;
   color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
 }
+.hist-day-line:active { background: var(--accent-light); }
 .hist-day-line.override { color: var(--accent); font-weight: 600; }
 
 /* ITEMS TAB */
