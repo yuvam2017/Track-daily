@@ -499,4 +499,101 @@ function openQtyOverrideModal(id, dateKey, onSaved){
 function openPickDayModal(){
   if(state.items.length === 0){ alert("Add an item first."); return; }
   const options = state.items.map(i => `<option value="${i.id}">${escapeHtml(i.icon)} ${escapeHtml(i.name)}</option>`).join("");
-  modalBox.
+  modalBox.innerHTML = `
+    <h2>Edit a different day</h2>
+    <p class="muted">Pick the item and date you want to set a one-off quantity for.</p>
+    <div class="field"><label>Item</label><select id="f-item">${options}</select></div>
+    <div class="field"><label>Date</label><input id="f-date" type="date" value="${todayKey()}"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-primary" id="f-next">Next</button>
+    </div>
+  `;
+  overlay.classList.remove("hidden");
+  document.getElementById("f-cancel").onclick = closeModal;
+  document.getElementById("f-next").onclick = () => {
+    const itemId = document.getElementById("f-item").value;
+    const date = document.getElementById("f-date").value;
+    if(!date){ alert("Please pick a date."); return; }
+    const refresh = currentTab === "history" ? renderHistory : renderToday;
+    openQtyOverrideModal(itemId, date, refresh);
+  };
+}
+
+/* ---------------- utils ---------------- */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+/* ---------------- nav wiring ---------------- */
+document.querySelectorAll(".nav-btn").forEach(btn=>{
+  btn.onclick = () => goTab(btn.dataset.tab);
+});
+
+/* ---------------- lock screen ---------------- */
+const lockScreen = document.getElementById("lockScreen");
+const appEl = document.getElementById("app");
+const lockInput = document.getElementById("lockInput");
+const lockBtn = document.getElementById("lockBtn");
+const lockTitle = document.getElementById("lockTitle");
+const lockSub = document.getElementById("lockSub");
+const lockError = document.getElementById("lockError");
+
+function hasPasscode(){ return !!localStorage.getItem(PASSCODE_KEY); }
+
+function setupLockScreen(){
+  if(!hasPasscode()){
+    lockTitle.textContent = "Set a passcode";
+    lockSub.textContent = "This just locks the app on this device — pick anything you'll remember.";
+    lockBtn.textContent = "Set passcode";
+  } else {
+    lockTitle.textContent = "Enter passcode";
+    lockSub.textContent = "Unlock your tracker";
+    lockBtn.textContent = "Unlock";
+  }
+  lockError.textContent = "";
+  lockInput.value = "";
+}
+
+function tryUnlock(){
+  const val = lockInput.value.trim();
+  if(!val){ lockError.textContent = "Please enter a passcode."; return; }
+  if(!hasPasscode()){
+    if(val.length < 4){ lockError.textContent = "Use at least 4 characters."; return; }
+    localStorage.setItem(PASSCODE_KEY, val);
+    unlockApp();
+    return;
+  }
+  if(val === localStorage.getItem(PASSCODE_KEY)){
+    unlockApp();
+  } else {
+    lockError.textContent = "Wrong passcode. Try again.";
+    lockInput.value = "";
+  }
+}
+function unlockApp(){
+  sessionStorage.setItem(SESSION_KEY, "1");
+  lockScreen.classList.add("hidden");
+  appEl.classList.remove("hidden");
+  goTab("today");
+}
+lockBtn.onclick = tryUnlock;
+lockInput.addEventListener("keydown", e => { if(e.key === "Enter") tryUnlock(); });
+
+document.getElementById("logoutBtn").onclick = () => {
+  sessionStorage.removeItem(SESSION_KEY);
+  appEl.classList.add("hidden");
+  lockScreen.classList.remove("hidden");
+  setupLockScreen();
+};
+
+/* ---------------- boot ---------------- */
+loadState();
+if(sessionStorage.getItem(SESSION_KEY) === "1"){
+  lockScreen.classList.add("hidden");
+  appEl.classList.remove("hidden");
+  goTab("today");
+} else {
+  setupLockScreen();
+}
