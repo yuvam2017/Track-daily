@@ -224,9 +224,9 @@ function renderHistory(){
         <div class="amt">₹${itemAmt.toFixed(2)}</div>
       </div>
       ${isOpen ? `<div class="hist-days">
-        ${dayLines.map(l => `<div class="hist-day-line ${l.overridden?'override':''}">
+        ${dayLines.map(l => `<div class="hist-day-line ${l.overridden?'override':''}" data-edit-item="${item.id}" data-edit-date="${l.dateKey}">
             <span>${l.d} ${monthLabel(historyYear,historyMonth).split(" ")[0].slice(0,3)}</span>
-            <span>${l.qty} ${item.unit} × ₹${l.rate} = ₹${l.amt.toFixed(2)}</span>
+            <span>${l.qty} ${item.unit} × ₹${l.rate} = ₹${l.amt.toFixed(2)} ✎</span>
           </div>`).join("")}
       </div>` : ""}
     `;
@@ -243,6 +243,12 @@ function renderHistory(){
       const id = el.dataset.toggle;
       openHistoryItemId = (openHistoryItemId === id) ? null : id;
       renderHistory();
+    };
+  });
+  list.querySelectorAll("[data-edit-item]").forEach(el=>{
+    el.onclick = (e) => {
+      e.stopPropagation();
+      openQtyOverrideModal(el.dataset.editItem, el.dataset.editDate, renderHistory);
     };
   });
 }
@@ -327,6 +333,7 @@ function renderItems(){
 }
 
 document.getElementById("addItemBtn").onclick = openAddItemModal;
+document.getElementById("pickDayBtn").onclick = openPickDayModal;
 
 /* ---------------- MODALS ---------------- */
 const overlay = document.getElementById("modalOverlay");
@@ -444,112 +451,52 @@ function openChangeRateModal(id){
   };
 }
 
-function openQtyOverrideModal(id, dateKey){
+function openQtyOverrideModal(id, dateKey, onSaved){
   const item = state.items.find(i=>i.id===id);
-  const current = getQtyForDate(item, dateKey);
-  modalBox.innerHTML = `
-    <h2>${escapeHtml(item.name)} — just for today</h2>
-    <p class="muted">This changes only today's quantity. Your everyday default stays the same.</p>
-    <div class="field"><label>Quantity (${escapeHtml(item.unit)})</label><input id="f-qty" type="number" step="any" value="${current}"></div>
-    <div class="modal-actions">
-      <button class="btn-cancel" id="f-reset">Use default</button>
-      <button class="btn-primary" id="f-save">Save</button>
-    </div>
-  `;
+  const refresh = onSaved || renderToday;
+  const isToday = dateKey === todayKey();
+
+  const render = (activeDate) => {
+    const current = getQtyForDate(item, activeDate);
+    const isDefault = current === getDefaultQtyOnDate(item, activeDate);
+    modalBox.innerHTML = `
+      <h2>${escapeHtml(item.name)} — one-off quantity</h2>
+      <p class="muted">This changes the quantity for the date below only. Your everyday default stays the same.</p>
+      <div class="field"><label>Date</label><input id="f-date" type="date" value="${activeDate}"></div>
+      <div class="field"><label>Quantity (${escapeHtml(item.unit)})</label><input id="f-qty" type="number" step="any" value="${current}"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="f-reset">${isDefault ? "No override" : "Use default"}</button>
+        <button class="btn-primary" id="f-save">Save</button>
+      </div>
+    `;
+    document.getElementById("f-date").onchange = (e) => render(e.target.value);
+    document.getElementById("f-reset").onclick = () => {
+      const d = document.getElementById("f-date").value;
+      if(item.overrides) delete item.overrides[d];
+      saveState();
+      closeModal();
+      refresh();
+    };
+    document.getElementById("f-save").onclick = () => {
+      const d = document.getElementById("f-date").value;
+      const qty = parseFloat(document.getElementById("f-qty").value);
+      if(!d){ alert("Please pick a date."); return; }
+      if(isNaN(qty)){ alert("Enter a valid number."); return; }
+      if(!item.overrides) item.overrides = {};
+      const defaultQty = getDefaultQtyOnDate(item, d);
+      if(qty === defaultQty){ delete item.overrides[d]; }
+      else { item.overrides[d] = qty; }
+      saveState();
+      closeModal();
+      refresh();
+    };
+  };
+
   overlay.classList.remove("hidden");
-  document.getElementById("f-reset").onclick = () => {
-    if(item.overrides) delete item.overrides[dateKey];
-    saveState();
-    closeModal();
-    renderToday();
-  };
-  document.getElementById("f-save").onclick = () => {
-    const qty = parseFloat(document.getElementById("f-qty").value);
-    if(isNaN(qty)){ alert("Enter a valid number."); return; }
-    if(!item.overrides) item.overrides = {};
-    const defaultQty = getDefaultQtyOnDate(item, dateKey);
-    if(qty === defaultQty){ delete item.overrides[dateKey]; }
-    else { item.overrides[dateKey] = qty; }
-    saveState();
-    closeModal();
-    renderToday();
-  };
+  render(dateKey);
 }
 
-/* ---------------- utils ---------------- */
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-}
-function escapeAttr(s){ return escapeHtml(s); }
-
-/* ---------------- nav wiring ---------------- */
-document.querySelectorAll(".nav-btn").forEach(btn=>{
-  btn.onclick = () => goTab(btn.dataset.tab);
-});
-
-/* ---------------- lock screen ---------------- */
-const lockScreen = document.getElementById("lockScreen");
-const appEl = document.getElementById("app");
-const lockInput = document.getElementById("lockInput");
-const lockBtn = document.getElementById("lockBtn");
-const lockTitle = document.getElementById("lockTitle");
-const lockSub = document.getElementById("lockSub");
-const lockError = document.getElementById("lockError");
-
-function hasPasscode(){ return !!localStorage.getItem(PASSCODE_KEY); }
-
-function setupLockScreen(){
-  if(!hasPasscode()){
-    lockTitle.textContent = "Set a passcode";
-    lockSub.textContent = "This just locks the app on this device — pick anything you'll remember.";
-    lockBtn.textContent = "Set passcode";
-  } else {
-    lockTitle.textContent = "Enter passcode";
-    lockSub.textContent = "Unlock your tracker";
-    lockBtn.textContent = "Unlock";
-  }
-  lockError.textContent = "";
-  lockInput.value = "";
-}
-
-function tryUnlock(){
-  const val = lockInput.value.trim();
-  if(!val){ lockError.textContent = "Please enter a passcode."; return; }
-  if(!hasPasscode()){
-    if(val.length < 4){ lockError.textContent = "Use at least 4 characters."; return; }
-    localStorage.setItem(PASSCODE_KEY, val);
-    unlockApp();
-    return;
-  }
-  if(val === localStorage.getItem(PASSCODE_KEY)){
-    unlockApp();
-  } else {
-    lockError.textContent = "Wrong passcode. Try again.";
-    lockInput.value = "";
-  }
-}
-function unlockApp(){
-  sessionStorage.setItem(SESSION_KEY, "1");
-  lockScreen.classList.add("hidden");
-  appEl.classList.remove("hidden");
-  goTab("today");
-}
-lockBtn.onclick = tryUnlock;
-lockInput.addEventListener("keydown", e => { if(e.key === "Enter") tryUnlock(); });
-
-document.getElementById("logoutBtn").onclick = () => {
-  sessionStorage.removeItem(SESSION_KEY);
-  appEl.classList.add("hidden");
-  lockScreen.classList.remove("hidden");
-  setupLockScreen();
-};
-
-/* ---------------- boot ---------------- */
-loadState();
-if(sessionStorage.getItem(SESSION_KEY) === "1"){
-  lockScreen.classList.add("hidden");
-  appEl.classList.remove("hidden");
-  goTab("today");
-} else {
-  setupLockScreen();
-}
+function openPickDayModal(){
+  if(state.items.length === 0){ alert("Add an item first."); return; }
+  const options = state.items.map(i => `<option value="${i.id}">${escapeHtml(i.icon)} ${escapeHtml(i.name)}</option>`).join("");
+  modalBox.
