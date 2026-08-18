@@ -133,6 +133,7 @@ body {
 }
 .today-summary .amt { font-size: 26px; font-weight: 700; }
 .today-summary .lbl { font-size: 13px; opacity: 0.85; }
+.summary-row { display: flex; justify-content: space-between; gap: 16px; }
 
 .items-list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -232,6 +233,11 @@ body {
 }
 .hist-day-line:active { background: var(--accent-light); }
 .hist-day-line.override { color: var(--accent); font-weight: 600; }
+.hist-balance-block {
+  margin-top: 8px;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
 
 /* ITEMS TAB */
 .manage-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
@@ -257,6 +263,21 @@ body {
   color: var(--text);
 }
 .chip-btn.danger { color: var(--danger); }
+.chip-btn.accent { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+.balance-line { font-weight: 600; margin-top: 6px; }
+.balance-line.due { color: var(--danger); }
+.balance-line.credit { color: var(--accent); }
+.balance-line.settled { color: var(--muted); font-weight: 400; }
+
+.payments-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+.payment-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.payment-amt { font-weight: 700; color: var(--accent); }
 
 /* MODAL */
 .modal-overlay {
