@@ -1115,15 +1115,69 @@ function openPaymentsListModal(id){
   render();
 }
 
-/* ---------------- backup: export / import as JSON ---------------- */
+/* ---------------- backup: export / import as JSON ----------------
+   Format (human-readable, month-wise):
+   {
+     "Milk": {
+       "unit": "L",
+       "August 2026": {
+         "rate": 50,
+         "12-08-2026": 1,
+         "13-08-2026": 1,
+         "payment": 1500
+       },
+       "September 2026": { ... }
+     },
+     "Newspaper": { ... }
+   }
+   Dates are "DD-MM-YYYY". Each month block holds that month's rate,
+   one key per day with that day's actual quantity, and a single
+   "payment" number — the total paid against that item that month.
+--------------------------------------------------------------------*/
+function formatDMY(dateKey){
+  const [y,m,d] = dateKey.split("-");
+  return `${d}-${m}-${y}`;
+}
+function parseDMY(str){
+  const parts = str.split("-");
+  if(parts.length !== 3) return null;
+  const [d,m,y] = parts;
+  if(!/^\d{1,2}$/.test(d) || !/^\d{1,2}$/.test(m) || !/^\d{4}$/.test(y)) return null;
+  return `${y}-${pad(parseInt(m,10))}-${pad(parseInt(d,10))}`;
+}
+function parseMonthLabel(label){
+  // "August 2026" -> {year, month} (month is 0-indexed)
+  const d = new Date("1 " + label);
+  if(isNaN(d.getTime())) return null;
+  return { year: d.getFullYear(), month: d.getMonth() };
+}
+
 function exportJSON(){
-  const payload = {
-    app: "ghar-tracker",
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    data: state
-  };
-  const json = JSON.stringify(payload, null, 2);
+  const out = {};
+  const endKey = todayKey();
+
+  state.items.forEach(item=>{
+    const monthsObj = {};
+    if(item.createdAt <= endKey){
+      const start = new Date(item.createdAt + "T00:00:00");
+      const end = new Date(endKey + "T00:00:00");
+      for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+        const k = toKey(d);
+        const label = monthLabel(d.getFullYear(), d.getMonth());
+        if(!monthsObj[label]) monthsObj[label] = { rate: getRateForDate(item, k) };
+        monthsObj[label][formatDMY(k)] = getQtyForDate(item, k);
+      }
+    }
+    (item.payments||[]).forEach(p=>{
+      const pd = new Date(p.date + "T00:00:00");
+      const label = monthLabel(pd.getFullYear(), pd.getMonth());
+      if(!monthsObj[label]) monthsObj[label] = { rate: getRateForDate(item, p.date) };
+      monthsObj[label].payment = (monthsObj[label].payment || 0) + p.amount;
+    });
+    out[item.name] = { unit: item.unit, ...monthsObj };
+  });
+
+  const json = JSON.stringify(out, null, 2);
   const blob = new Blob([json], {type: "application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1135,21 +1189,70 @@ function exportJSON(){
   URL.revokeObjectURL(url);
 }
 
-function normalizeImportedState(raw){
-  const items = Array.isArray(raw.items) ? raw.items : [];
-  return {
-    items: items.map(it => ({
-      id: it.id || makeId(),
-      name: it.name || "Item",
-      unit: it.unit || "unit",
-      icon: it.icon || ICONS[0],
-      qtyHistory: Array.isArray(it.qtyHistory) ? it.qtyHistory : [],
-      rateHistory: Array.isArray(it.rateHistory) ? it.rateHistory : [],
-      overrides: (it.overrides && typeof it.overrides === "object") ? it.overrides : {},
-      payments: Array.isArray(it.payments) ? it.payments : [],
-      createdAt: it.createdAt || todayKey()
-    }))
-  };
+function buildStateFromImport(raw){
+  const items = [];
+  let iconIdx = 0;
+
+  Object.keys(raw).forEach(itemName=>{
+    const itemObj = raw[itemName];
+    if(!itemObj || typeof itemObj !== "object") return;
+    const unit = itemObj.unit || "unit";
+    let rateValue = 0;
+    const dayEntries = []; // {dateKey, qty}
+    const monthPayments = []; // {dateKey, amount}
+
+    Object.keys(itemObj).forEach(key=>{
+      if(key === "unit") return;
+      const monthBlock = itemObj[key];
+      if(!monthBlock || typeof monthBlock !== "object") return;
+      const monthInfo = parseMonthLabel(key);
+
+      Object.keys(monthBlock).forEach(subKey=>{
+        if(subKey === "rate"){
+          rateValue = Number(monthBlock.rate) || rateValue;
+        } else if(subKey === "payment"){
+          const amount = Number(monthBlock.payment) || 0;
+          if(amount > 0 && monthInfo){
+            // record payment as the last day of that month
+            const lastDay = daysInMonth(monthInfo.year, monthInfo.month);
+            monthPayments.push({ dateKey: monthInfo.year+"-"+pad(monthInfo.month+1)+"-"+pad(lastDay), amount });
+          }
+        } else {
+          const dateKey = parseDMY(subKey);
+          if(dateKey){
+            const qty = Number(monthBlock[subKey]);
+            if(!isNaN(qty)) dayEntries.push({dateKey, qty});
+          }
+        }
+      });
+    });
+
+    dayEntries.sort((a,b) => a.dateKey < b.dateKey ? -1 : (a.dateKey > b.dateKey ? 1 : 0));
+
+    const qtyHistory = [];
+    dayEntries.forEach(({dateKey, qty}) => {
+      const last = qtyHistory[qtyHistory.length - 1];
+      if(!last || last.val !== qty){
+        qtyHistory.push({from: dateKey, val: qty});
+      }
+    });
+
+    const createdAt = dayEntries.length ? dayEntries[0].dateKey : todayKey();
+
+    items.push({
+      id: makeId(),
+      name: itemName,
+      unit,
+      icon: ICONS[iconIdx++ % ICONS.length],
+      qtyHistory: qtyHistory.length ? qtyHistory : [{from: createdAt, val: 0}],
+      rateHistory: [{from: createdAt, val: rateValue}],
+      overrides: {},
+      payments: monthPayments.map(p => ({id: makeId(), date: p.dateKey, amount: p.amount, note: ""})),
+      createdAt
+    });
+  });
+
+  return { items };
 }
 
 function importJSONFile(file){
@@ -1162,17 +1265,19 @@ function importJSONFile(file){
       alert("That file doesn't look like valid JSON.");
       return;
     }
-    // Accept either the wrapped export format ({ data: {...} }) or a raw { items: [...] } object.
-    const raw = (parsed && typeof parsed === "object" && parsed.data) ? parsed.data : parsed;
-    if(!raw || !Array.isArray(raw.items)){
+    if(!parsed || typeof parsed !== "object" || Array.isArray(parsed)){
       alert("That file doesn't look like a Ghar Tracker backup.");
       return;
     }
-    const count = raw.items.length;
-    const ok = confirm(`This will replace all current items and history on this device with the ${count} item${count===1?"":"s"} in this backup. This can't be undone — continue?`);
+    const itemNames = Object.keys(parsed);
+    if(itemNames.length === 0){
+      alert("That file doesn't have any items in it.");
+      return;
+    }
+    const ok = confirm(`This will replace all current items and history on this device with the ${itemNames.length} item${itemNames.length===1?"":"s"} in this backup (${itemNames.join(", ")}). This can't be undone — continue?`);
     if(!ok) return;
 
-    state = normalizeImportedState(raw);
+    state = buildStateFromImport(parsed);
     saveState();
     renderItems();
     if(currentTab === "today") renderToday();
