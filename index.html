@@ -25,7 +25,341 @@
 <meta name="twitter:description" content="Track milk, newspaper, water cans, eggs and other daily household items — quantities, rates, and monthly bills, automatically.">
 <meta name="twitter:image" content="og-image.png">
 
-<link rel="stylesheet" href="style.css">
+<style>
+:root {
+  --accent: #2f6f5e;
+  --accent-light: #e7f2ee;
+  --danger: #c1503d;
+  --danger-light: #fbeae6;
+  --bg: #f7f7f5;
+  --card: #ffffff;
+  --text: #23291f;
+  --muted: #7a8177;
+  --border: #e6e6e2;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hidden { display: none !important; }
+.muted { color: var(--muted); font-size: 14px; }
+
+/* LOCK SCREEN */
+#lockScreen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.lock-box {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.lock-emoji { font-size: 40px; margin-bottom: 8px; }
+.lock-box h1 { font-size: 20px; margin: 0 0 4px; }
+.lock-box input {
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px;
+  font-size: 20px;
+  text-align: center;
+  letter-spacing: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.error-text { color: var(--danger); font-size: 13px; min-height: 18px; margin-top: 8px; }
+
+/* APP LAYOUT */
+#app { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 10px;
+}
+.topbar h1 { font-size: 22px; margin: 0; }
+
+#main { flex: 1; padding: 8px 16px 90px; overflow-y: auto; }
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.nav-btn {
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 10px 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.nav-btn span { font-size: 20px; }
+.nav-btn.active { color: var(--accent); font-weight: 600; }
+
+/* BUTTONS */
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-secondary {
+  background: var(--accent-light);
+  color: var(--accent);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 14px;
+}
+.full-width { width: 100%; }
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+/* TODAY TAB */
+.today-summary {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin: 8px 0 16px;
+}
+.today-summary .amt { font-size: 26px; font-weight: 700; }
+.today-summary .lbl { font-size: 13px; opacity: 0.85; }
+.summary-row { display: flex; justify-content: space-between; gap: 16px; }
+
+.items-list { display: flex; flex-direction: column; gap: 10px; }
+
+.item-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  border: 1px solid var(--border);
+}
+.item-card.skipped { opacity: 0.55; }
+.item-icon {
+  font-size: 26px;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-light);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.item-card.skipped .item-icon { background: var(--danger-light); }
+.item-info { flex: 1; min-width: 0; }
+.item-name { font-weight: 600; font-size: 16px; }
+.item-qty { font-size: 14px; color: var(--muted); }
+.item-qty.custom { color: var(--accent); font-weight: 600; }
+
+.big-toggle {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  flex-shrink: 0;
+}
+.item-card.skipped .big-toggle { background: var(--danger); }
+
+.edit-pencil {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--muted);
+  padding: 6px;
+  cursor: pointer;
+}
+
+.empty-state { text-align: center; padding: 40px 20px; }
+.empty-state .btn-primary { margin-top: 14px; }
+
+/* HISTORY TAB */
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 4px;
+}
+.month-label { font-weight: 600; font-size: 17px; }
+.month-total-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.month-total-card .big { font-size: 24px; font-weight: 700; color: var(--accent); }
+
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.hist-row {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.hist-row-head {
+  display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer;
+}
+.hist-row-head .name { font-weight: 600; }
+.hist-row-head .amt { font-weight: 700; color: var(--accent); }
+.hist-days {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.hist-day-line {
+  display: flex; justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 4px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.hist-day-line:active { background: var(--accent-light); }
+.hist-day-line.override { color: var(--accent); font-weight: 600; }
+.hist-balance-block {
+  margin-top: 8px;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+/* ITEMS TAB */
+.manage-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.manage-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.manage-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.manage-card-head .name { font-weight: 600; font-size: 16px; }
+.manage-card .meta { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.manage-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.chip-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+}
+.chip-btn.danger { color: var(--danger); }
+.chip-btn.accent { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+.balance-line { font-weight: 600; margin-top: 6px; }
+.balance-line.due { color: var(--danger); }
+.balance-line.credit { color: var(--accent); }
+.balance-line.settled { color: var(--muted); font-weight: 400; }
+
+.payments-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+.payment-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.payment-amt { font-weight: 700; color: var(--accent); }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: flex-end;
+  z-index: 50;
+}
+.modal-box {
+  background: var(--card);
+  width: 100%;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.modal-box h2 { margin: 0 0 14px; font-size: 18px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.field input, .field select {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+.modal-actions button { flex: 1; }
+.btn-cancel {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.backup-section {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.backup-section h3 { font-size: 15px; margin: 0 0 4px; }
+.backup-section .btn-secondary { margin-top: 10px; }
+
+@media (min-width: 600px) {
+  #main { max-width: 560px; margin: 0 auto; width: 100%; }
+  .topbar { max-width: 560px; margin: 0 auto; width: 100%; }
+  .bottom-nav { max-width: 560px; margin: 0 auto; left: 0; right: 0; border-radius: 16px 16px 0 0; }
+}
+
+</style>
 </head>
 <body>
 
@@ -78,6 +412,14 @@
       <section id="tab-items" class="tab hidden">
         <button id="addItemBtn" class="btn-primary full-width">+ Add new item</button>
         <div id="manageList" class="manage-list"></div>
+
+        <div class="backup-section">
+          <h3>Backup &amp; restore</h3>
+          <p class="muted">Save everything — items, history, payments — as a file you can keep, or restore from one.</p>
+          <button id="exportJsonBtn" class="btn-secondary full-width">⬇ Export backup (JSON)</button>
+          <button id="importJsonBtn" class="btn-secondary full-width">⬆ Import backup (JSON)</button>
+          <input type="file" id="importJsonInput" accept="application/json,.json" class="hidden">
+        </div>
       </section>
 
     </main>
@@ -94,6 +436,839 @@
     <div class="modal-box" id="modalBox"></div>
   </div>
 
-  <script src="index.js"></script>
+  <script>
+/* ============================================================
+   Ghar Tracker — simple local household item tracker
+   No backend. Everything lives in localStorage on this device.
+   ============================================================ */
+
+const STORAGE_KEY = "ghar-tracker-data-v1";
+const PASSCODE_KEY = "ghar-tracker-passcode-v1";
+const SESSION_KEY = "ghar-tracker-unlocked";
+
+const ICONS = ["🥛","📰","💧","🥚","🍞","🧴","🧀","🧃","🛢️","📦","🧻","🧂"];
+
+/* ---------------- date helpers ---------------- */
+function pad(n){ return n < 10 ? "0"+n : ""+n; }
+function toKey(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function todayKey(){ return toKey(new Date()); }
+function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
+function monthLabel(y,m){
+  return new Date(y,m,1).toLocaleDateString(undefined,{month:"long", year:"numeric"});
+}
+
+/* ---------------- state ---------------- */
+let state = { items: [] };
+
+function loadState(){
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    state = raw ? JSON.parse(raw) : { items: [] };
+  } catch(e){ state = { items: [] }; }
+}
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* ---------------- effective-dated value resolution ----------------
+   history = [{from:"YYYY-MM-DD", val:number}, ...] kept sorted ascending
+--------------------------------------------------------------------*/
+function getEffectiveValue(history, dateKey, fallback){
+  if(!history || !history.length) return fallback;
+  let result = history[0].val;
+  for(const h of history){
+    if(h.from <= dateKey) result = h.val;
+    else break;
+  }
+  return result;
+}
+function setEffectiveValue(history, dateKey, val){
+  const idx = history.findIndex(h => h.from === dateKey);
+  if(idx >= 0){ history[idx].val = val; }
+  else { history.push({from: dateKey, val}); }
+  history.sort((a,b) => a.from < b.from ? -1 : 1);
+}
+
+function getQtyForDate(item, dateKey){
+  if(item.overrides && Object.prototype.hasOwnProperty.call(item.overrides, dateKey)){
+    return item.overrides[dateKey];
+  }
+  return getEffectiveValue(item.qtyHistory, dateKey, 0);
+}
+function getRateForDate(item, dateKey){
+  return getEffectiveValue(item.rateHistory, dateKey, 0);
+}
+function isOverridden(item, dateKey){
+  return item.overrides && Object.prototype.hasOwnProperty.call(item.overrides, dateKey);
+}
+function getDefaultQtyOnDate(item, dateKey){
+  return getEffectiveValue(item.qtyHistory, dateKey, 0);
+}
+
+/* ---------------- item CRUD ---------------- */
+function makeId(){ return "id" + Date.now() + Math.random().toString(16).slice(2,8); }
+
+function addItem({name, unit, icon, qty, rate}){
+  const today = todayKey();
+  state.items.push({
+    id: makeId(),
+    name, unit, icon: icon || ICONS[state.items.length % ICONS.length],
+    qtyHistory: [{from: today, val: qty}],
+    rateHistory: [{from: today, val: rate}],
+    overrides: {},
+    payments: [],
+    createdAt: today
+  });
+  saveState();
+}
+function deleteItem(id){
+  state.items = state.items.filter(i => i.id !== id);
+  saveState();
+}
+function updateItemBasic(id, {name, unit, icon}){
+  const it = state.items.find(i=>i.id===id);
+  if(!it) return;
+  it.name = name; it.unit = unit; it.icon = icon;
+  saveState();
+}
+
+/* ---------------- payments & balance ----------------
+   Payments are recorded against an item for any date/amount —
+   they don't have to match any single day's bill. Balance =
+   everything billed since the item was created, minus everything paid.
+--------------------------------------------------------------------*/
+function getTotalBilledUpTo(item, uptoDateKey){
+  if(uptoDateKey < item.createdAt) return 0;
+  let total = 0;
+  const start = new Date(item.createdAt + "T00:00:00");
+  const end = new Date(uptoDateKey + "T00:00:00");
+  for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+    const k = toKey(d);
+    total += getQtyForDate(item, k) * getRateForDate(item, k);
+  }
+  return total;
+}
+function getTotalPaidUpTo(item, uptoDateKey){
+  return (item.payments||[]).filter(p => p.date <= uptoDateKey).reduce((s,p)=>s+p.amount,0);
+}
+function getBalance(item, uptoDateKey){
+  const upto = uptoDateKey || todayKey();
+  return getTotalBilledUpTo(item, upto) - getTotalPaidUpTo(item, upto);
+}
+function addPayment(item, date, amount, note){
+  if(!item.payments) item.payments = [];
+  item.payments.push({id: makeId(), date, amount, note: note || ""});
+  item.payments.sort((a,b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+  saveState();
+}
+function deletePayment(item, paymentId){
+  item.payments = (item.payments||[]).filter(p => p.id !== paymentId);
+  saveState();
+}
+
+/* ---------------- rendering ---------------- */
+let currentTab = "today";
+let historyMonth = new Date().getMonth();
+let historyYear = new Date().getFullYear();
+let openHistoryItemId = null;
+
+function goTab(tab){
+  currentTab = tab;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+  document.getElementById("tab-"+tab).classList.remove("hidden");
+  document.querySelectorAll(".nav-btn").forEach(b=>{
+    b.classList.toggle("active", b.dataset.tab === tab);
+  });
+  const titles = {today:"Today", history:"History", items:"Manage items"};
+  document.getElementById("pageTitle").textContent = titles[tab];
+  if(tab === "today") renderToday();
+  if(tab === "history") renderHistory();
+  if(tab === "items") renderItems();
+}
+
+function renderToday(){
+  const list = document.getElementById("itemsList");
+  const empty = document.getElementById("emptyToday");
+  const tKey = todayKey();
+  list.innerHTML = "";
+
+  if(state.items.length === 0){
+    empty.classList.remove("hidden");
+    document.getElementById("todaySummary").classList.add("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  let totalAmt = 0;
+  state.items.forEach(item=>{
+    const qty = getQtyForDate(item, tKey);
+    const rate = getRateForDate(item, tKey);
+    const amt = qty * rate;
+    totalAmt += amt;
+    const skipped = qty === 0;
+    const overridden = isOverridden(item, tKey);
+    const defaultQty = getDefaultQtyOnDate(item, tKey);
+
+    const card = document.createElement("div");
+    card.className = "item-card" + (skipped ? " skipped" : "");
+    card.innerHTML = `
+      <div class="item-icon">${item.icon}</div>
+      <div class="item-info">
+        <div class="item-name">${escapeHtml(item.name)}</div>
+        <div class="item-qty ${overridden && !skipped ? 'custom' : ''}">
+          ${skipped ? "Not taken today" : (qty + " " + item.unit + " today")}
+          ${overridden && !skipped ? " (adjusted)" : ""}
+        </div>
+      </div>
+      <button class="edit-pencil" data-action="editqty" data-id="${item.id}">✎</button>
+      <button class="big-toggle" data-action="toggle" data-id="${item.id}">${skipped ? "✕" : "✓"}</button>
+    `;
+    list.appendChild(card);
+  });
+
+  const totalDue = state.items.reduce((s, item) => s + getBalance(item, tKey), 0);
+
+  document.getElementById("todaySummary").classList.remove("hidden");
+  document.getElementById("todaySummary").innerHTML = `
+    <div class="summary-row">
+      <div>
+        <div class="lbl">Today's total</div>
+        <div class="amt">₹${totalAmt.toFixed(2)}</div>
+      </div>
+      <div>
+        <div class="lbl">Total due</div>
+        <div class="amt">₹${totalDue.toFixed(2)}</div>
+      </div>
+    </div>
+  `;
+
+  list.querySelectorAll('[data-action="toggle"]').forEach(btn=>{
+    btn.onclick = () => {
+      const item = state.items.find(i=>i.id===btn.dataset.id);
+      const qty = getQtyForDate(item, tKey);
+      if(!item.overrides) item.overrides = {};
+      if(qty === 0){
+        // currently skipped -> restore default (remove override)
+        delete item.overrides[tKey];
+      } else {
+        // mark skipped
+        item.overrides[tKey] = 0;
+      }
+      saveState();
+      renderToday();
+    };
+  });
+  list.querySelectorAll('[data-action="editqty"]').forEach(btn=>{
+    btn.onclick = () => openQtyOverrideModal(btn.dataset.id, tKey);
+  });
+}
+
+/* ---------------- HISTORY TAB ---------------- */
+function renderHistory(){
+  document.getElementById("monthLabel").textContent = monthLabel(historyYear, historyMonth);
+  const totalCard = document.getElementById("monthTotalCard");
+  const list = document.getElementById("historyList");
+  list.innerHTML = "";
+
+  const dim = daysInMonth(historyYear, historyMonth);
+  const today = new Date();
+  const isCurrentMonth = (today.getFullYear()===historyYear && today.getMonth()===historyMonth);
+  const lastDay = isCurrentMonth ? today.getDate() : dim;
+
+  let grandTotal = 0;
+
+  if(state.items.length === 0){
+    totalCard.innerHTML = `<div class="muted">No items yet — add one in the Items tab.</div>`;
+    return;
+  }
+
+  state.items.forEach(item=>{
+    let itemQty = 0, itemAmt = 0;
+    const dayLines = [];
+    for(let d=1; d<=lastDay; d++){
+      const dateKey = historyYear+"-"+pad(historyMonth+1)+"-"+pad(d);
+      if(dateKey < item.createdAt) continue; // item didn't exist yet
+      const qty = getQtyForDate(item, dateKey);
+      const rate = getRateForDate(item, dateKey);
+      itemQty += qty;
+      itemAmt += qty*rate;
+      dayLines.push({dateKey, d, qty, rate, amt: qty*rate, overridden: isOverridden(item, dateKey)});
+    }
+    grandTotal += itemAmt;
+
+    const monthEndKey = historyYear+"-"+pad(historyMonth+1)+"-"+pad(lastDay);
+    const balanceAtMonthEnd = getBalance(item, monthEndKey);
+    const paymentsThisMonth = (item.payments||[]).filter(p => p.date >= (historyYear+"-"+pad(historyMonth+1)+"-01") && p.date <= monthEndKey);
+
+    const row = document.createElement("div");
+    row.className = "hist-row";
+    const isOpen = openHistoryItemId === item.id;
+    row.innerHTML = `
+      <div class="hist-row-head" data-toggle="${item.id}">
+        <div>
+          <span class="name">${item.icon} ${escapeHtml(item.name)}</span>
+          <div class="muted">${itemQty.toFixed(2)} ${item.unit}</div>
+        </div>
+        <div class="amt">₹${itemAmt.toFixed(2)}</div>
+      </div>
+      ${isOpen ? `<div class="hist-days">
+        ${dayLines.map(l => `<div class="hist-day-line ${l.overridden?'override':''}" data-edit-item="${item.id}" data-edit-date="${l.dateKey}">
+            <span>${l.d} ${monthLabel(historyYear,historyMonth).split(" ")[0].slice(0,3)}</span>
+            <span>${l.qty} ${item.unit} × ₹${l.rate} = ₹${l.amt.toFixed(2)} ✎</span>
+          </div>`).join("")}
+        <div class="hist-balance-block">
+          ${paymentsThisMonth.length ? paymentsThisMonth.map(p => `
+            <div class="hist-day-line" style="color:var(--accent);">
+              <span>💰 Paid ${p.date}${p.note ? " · " + escapeHtml(p.note) : ""}</span>
+              <span>₹${p.amount.toFixed(2)}</span>
+            </div>
+          `).join("") : `<div class="hist-day-line"><span>No payments this month</span><span></span></div>`}
+          <div class="hist-day-line" style="font-weight:700; color:${balanceAtMonthEnd > 0.004 ? 'var(--danger)' : 'var(--accent)'};">
+            <span>Balance as of ${lastDay} ${monthLabel(historyYear,historyMonth).split(" ")[0].slice(0,3)}</span>
+            <span>${balanceAtMonthEnd > 0.004 ? "₹"+balanceAtMonthEnd.toFixed(2)+" due" : "Paid up"}</span>
+          </div>
+        </div>
+      </div>` : ""}
+    `;
+    list.appendChild(row);
+  });
+
+  totalCard.innerHTML = `
+    <div class="muted">Total bill — ${monthLabel(historyYear,historyMonth)}</div>
+    <div class="big">₹${grandTotal.toFixed(2)}</div>
+  `;
+
+  list.querySelectorAll("[data-toggle]").forEach(el=>{
+    el.onclick = () => {
+      const id = el.dataset.toggle;
+      openHistoryItemId = (openHistoryItemId === id) ? null : id;
+      renderHistory();
+    };
+  });
+  list.querySelectorAll("[data-edit-item]").forEach(el=>{
+    el.onclick = (e) => {
+      e.stopPropagation();
+      openQtyOverrideModal(el.dataset.editItem, el.dataset.editDate, renderHistory);
+    };
+  });
+}
+
+document.getElementById("prevMonth").onclick = () => {
+  historyMonth--;
+  if(historyMonth < 0){ historyMonth = 11; historyYear--; }
+  renderHistory();
+};
+document.getElementById("nextMonth").onclick = () => {
+  historyMonth++;
+  if(historyMonth > 11){ historyMonth = 0; historyYear++; }
+  renderHistory();
+};
+
+document.getElementById("exportBtn").onclick = exportMonthCSV;
+
+function exportMonthCSV(){
+  const dim = daysInMonth(historyYear, historyMonth);
+  const today = new Date();
+  const isCurrentMonth = (today.getFullYear()===historyYear && today.getMonth()===historyMonth);
+  const lastDay = isCurrentMonth ? today.getDate() : dim;
+
+  let rows = [["Item","Date","Quantity","Unit","Rate","Amount","Adjusted"]];
+  state.items.forEach(item=>{
+    for(let d=1; d<=lastDay; d++){
+      const dateKey = historyYear+"-"+pad(historyMonth+1)+"-"+pad(d);
+      if(dateKey < item.createdAt) continue;
+      const qty = getQtyForDate(item, dateKey);
+      const rate = getRateForDate(item, dateKey);
+      rows.push([item.name, dateKey, qty, item.unit, rate, (qty*rate).toFixed(2), isOverridden(item,dateKey)?"Yes":""]);
+    }
+  });
+
+  rows.push([]);
+  rows.push(["Payments"]);
+  rows.push(["Item","Date","Amount","Note"]);
+  const monthStartKey = historyYear+"-"+pad(historyMonth+1)+"-01";
+  const monthEndKey = historyYear+"-"+pad(historyMonth+1)+"-"+pad(lastDay);
+  state.items.forEach(item=>{
+    (item.payments||[]).filter(p => p.date >= monthStartKey && p.date <= monthEndKey).forEach(p=>{
+      rows.push([item.name, p.date, p.amount.toFixed(2), p.note||""]);
+    });
+  });
+  rows.push([]);
+  rows.push(["Balance as of "+monthEndKey]);
+  rows.push(["Item","Total billed","Total paid","Balance due"]);
+  state.items.forEach(item=>{
+    rows.push([item.name, getTotalBilledUpTo(item, monthEndKey).toFixed(2), getTotalPaidUpTo(item, monthEndKey).toFixed(2), getBalance(item, monthEndKey).toFixed(2)]);
+  });
+
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ghar-tracker-${historyYear}-${pad(historyMonth+1)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------------- ITEMS TAB ---------------- */
+function renderItems(){
+  const list = document.getElementById("manageList");
+  list.innerHTML = "";
+  const tKey = todayKey();
+
+  state.items.forEach(item=>{
+    const qty = getDefaultQtyOnDate(item, tKey);
+    const rate = getRateForDate(item, tKey);
+    const balance = getBalance(item, tKey);
+    const card = document.createElement("div");
+    card.className = "manage-card";
+    card.innerHTML = `
+      <div class="manage-card-head">
+        <div class="name">${item.icon} ${escapeHtml(item.name)}</div>
+      </div>
+      <div class="meta">Default: ${qty} ${item.unit} · Rate: ₹${rate} / ${item.unit}</div>
+      <div class="meta balance-line ${balance > 0.004 ? 'due' : (balance < -0.004 ? 'credit' : 'settled')}">
+        ${balance > 0.004 ? `₹${balance.toFixed(2)} due` : (balance < -0.004 ? `₹${Math.abs(balance).toFixed(2)} paid in advance` : "All paid up")}
+      </div>
+      <div class="manage-actions">
+        <button class="chip-btn" data-act="editbasic" data-id="${item.id}">Edit name/unit</button>
+        <button class="chip-btn" data-act="changeqty" data-id="${item.id}">Change quantity</button>
+        <button class="chip-btn" data-act="changerate" data-id="${item.id}">Change rate</button>
+        <button class="chip-btn accent" data-act="pay" data-id="${item.id}">💰 Record payment</button>
+        <button class="chip-btn" data-act="payments" data-id="${item.id}">🧾 Payments (${(item.payments||[]).length})</button>
+        <button class="chip-btn danger" data-act="delete" data-id="${item.id}">Delete</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+
+  list.querySelectorAll('[data-act="editbasic"]').forEach(b=>b.onclick=()=>openEditBasicModal(b.dataset.id));
+  list.querySelectorAll('[data-act="changeqty"]').forEach(b=>b.onclick=()=>openChangeQtyModal(b.dataset.id));
+  list.querySelectorAll('[data-act="changerate"]').forEach(b=>b.onclick=()=>openChangeRateModal(b.dataset.id));
+  list.querySelectorAll('[data-act="pay"]').forEach(b=>b.onclick=()=>openRecordPaymentModal(b.dataset.id));
+  list.querySelectorAll('[data-act="payments"]').forEach(b=>b.onclick=()=>openPaymentsListModal(b.dataset.id));
+  list.querySelectorAll('[data-act="delete"]').forEach(b=>b.onclick=()=>{
+    const item = state.items.find(i=>i.id===b.dataset.id);
+    if(confirm(`Delete "${item.name}"? This removes all its history.`)){
+      deleteItem(b.dataset.id);
+      renderItems();
+    }
+  });
+}
+
+document.getElementById("addItemBtn").onclick = openAddItemModal;
+document.getElementById("pickDayBtn").onclick = openPickDayModal;
+
+/* ---------------- MODALS ---------------- */
+const overlay = document.getElementById("modalOverlay");
+const modalBox = document.getElementById("modalBox");
+
+function closeModal(){
+  overlay.classList.add("hidden");
+  modalBox.innerHTML = "";
+}
+overlay.onclick = (e) => { if(e.target === overlay) closeModal(); };
+
+function openAddItemModal(){
+  modalBox.innerHTML = `
+    <h2>Add new item</h2>
+    <div class="field"><label>Name</label><input id="f-name" placeholder="e.g. Milk"></div>
+    <div class="field"><label>Unit</label><input id="f-unit" placeholder="e.g. L, kg, piece, packet"></div>
+    <div class="field"><label>Default quantity (today onward)</label><input id="f-qty" type="number" step="any" placeholder="e.g. 1"></div>
+    <div class="field"><label>Rate per unit (₹)</label><input id="f-rate" type="number" step="any" placeholder="e.g. 60"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-primary" id="f-save">Add item</button>
+    </div>
+  `;
+  overlay.classList.remove("hidden");
+  document.getElementById("f-cancel").onclick = closeModal;
+  document.getElementById("f-save").onclick = () => {
+    const name = document.getElementById("f-name").value.trim();
+    const unit = document.getElementById("f-unit").value.trim();
+    const qty = parseFloat(document.getElementById("f-qty").value);
+    const rate = parseFloat(document.getElementById("f-rate").value);
+    if(!name || !unit || isNaN(qty) || isNaN(rate)){ alert("Please fill all fields."); return; }
+    addItem({name, unit, qty, rate});
+    closeModal();
+    renderItems();
+    if(currentTab==="today") renderToday();
+  };
+}
+
+function openEditBasicModal(id){
+  const item = state.items.find(i=>i.id===id);
+  modalBox.innerHTML = `
+    <h2>Edit item</h2>
+    <div class="field"><label>Name</label><input id="f-name" value="${escapeAttr(item.name)}"></div>
+    <div class="field"><label>Unit</label><input id="f-unit" value="${escapeAttr(item.unit)}"></div>
+    <div class="field"><label>Icon (emoji)</label><input id="f-icon" value="${escapeAttr(item.icon)}"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-primary" id="f-save">Save</button>
+    </div>
+  `;
+  overlay.classList.remove("hidden");
+  document.getElementById("f-cancel").onclick = closeModal;
+  document.getElementById("f-save").onclick = () => {
+    const name = document.getElementById("f-name").value.trim();
+    const unit = document.getElementById("f-unit").value.trim();
+    const icon = document.getElementById("f-icon").value.trim() || item.icon;
+    if(!name || !unit){ alert("Name and unit can't be empty."); return; }
+    updateItemBasic(id, {name, unit, icon});
+    closeModal();
+    renderItems();
+  };
+}
+
+function openChangeQtyModal(id){
+  const item = state.items.find(i=>i.id===id);
+  const tKey = todayKey();
+  modalBox.innerHTML = `
+    <h2>Change default quantity — ${escapeHtml(item.name)}</h2>
+    <p class="muted">This becomes the new everyday default from the date you choose, until you change it again.</p>
+    <div class="field"><label>New default quantity (${escapeHtml(item.unit)})</label><input id="f-qty" type="number" step="any" value="${getDefaultQtyOnDate(item, tKey)}"></div>
+    <div class="field"><label>Effective from</label><input id="f-date" type="date" value="${tKey}"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-primary" id="f-save">Save</button>
+    </div>
+  `;
+  overlay.classList.remove("hidden");
+  document.getElementById("f-cancel").onclick = closeModal;
+  document.getElementById("f-save").onclick = () => {
+    const qty = parseFloat(document.getElementById("f-qty").value);
+    const date = document.getElementById("f-date").value;
+    if(isNaN(qty) || !date){ alert("Please fill all fields."); return; }
+    setEffectiveValue(item.qtyHistory, date, qty);
+    saveState();
+    closeModal();
+    renderItems();
+    if(currentTab==="today") renderToday();
+  };
+}
+
+function openChangeRateModal(id){
+  const item = state.items.find(i=>i.id===id);
+  const tKey = todayKey();
+  modalBox.innerHTML = `
+    <h2>Change rate — ${escapeHtml(item.name)}</h2>
+    <p class="muted">Applies from the chosen date onward. Past bills stay calculated at the old rate.</p>
+    <div class="field"><label>New rate per ${escapeHtml(item.unit)} (₹)</label><input id="f-rate" type="number" step="any" value="${getRateForDate(item, tKey)}"></div>
+    <div class="field"><label>Effective from</label><input id="f-date" type="date" value="${tKey}"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-primary" id="f-save">Save</button>
+    </div>
+  `;
+  overlay.classList.remove("hidden");
+  document.getElementById("f-cancel").onclick = closeModal;
+  document.getElementById("f-save").onclick = () => {
+    const rate = parseFloat(document.getElementById("f-rate").value);
+    const date = document.getElementById("f-date").value;
+    if(isNaN(rate) || !date){ alert("Please fill all fields."); return; }
+    setEffectiveValue(item.rateHistory, date, rate);
+    saveState();
+    closeModal();
+    renderItems();
+    if(currentTab==="today") renderToday();
+  };
+}
+
+function openQtyOverrideModal(id, dateKey, onSaved){
+  const item = state.items.find(i=>i.id===id);
+  const refresh = onSaved || renderToday;
+  const isToday = dateKey === todayKey();
+
+  const render = (activeDate) => {
+    const current = getQtyForDate(item, activeDate);
+    const isDefault = current === getDefaultQtyOnDate(item, activeDate);
+    modalBox.innerHTML = `
+      <h2>${escapeHtml(item.name)} — one-off quantity</h2>
+      <p class="muted">This changes the quantity for the date below only. Your everyday default stays the same.</p>
+      <div class="field"><label>Date</label><input id="f-date" type="date" value="${activeDate}"></div>
+      <div class="field"><label>Quantity (${escapeHtml(item.unit)})</label><input id="f-qty" type="number" step="any" value="${current}"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="f-reset">${isDefault ? "No override" : "Use default"}</button>
+        <button class="btn-primary" id="f-save">Save</button>
+      </div>
+    `;
+    document.getElementById("f-date").onchange = (e) => render(e.target.value);
+    document.getElementById("f-reset").onclick = () => {
+      const d = document.getElementById("f-date").value;
+      if(item.overrides) delete item.overrides[d];
+      saveState();
+      closeModal();
+      refresh();
+    };
+    document.getElementById("f-save").onclick = () => {
+      const d = document.getElementById("f-date").value;
+      const qty = parseFloat(document.getElementById("f-qty").value);
+      if(!d){ alert("Please pick a date."); return; }
+      if(isNaN(qty)){ alert("Enter a valid number."); return; }
+      if(!item.overrides) item.overrides = {};
+      const defaultQty = getDefaultQtyOnDate(item, d);
+      if(qty === defaultQty){ delete item.overrides[d]; }
+      else { item.overrides[d] = qty; }
+      saveState();
+      closeModal();
+      refresh();
+    };
+  };
+
+  overlay.classList.remove("hidden");
+  render(dateKey);
+}
+
+function openPickDayModal(){
+  if(state.items.length === 0){ alert("Add an item first."); return; }
+  const options = state.items.map(i => `<option value="${i.id}">${escapeHtml(i.icon)} ${escapeHtml(i.name)}</option>`).join("");
+  modalBox.innerHTML = `
+    <h2>Edit a different day</h2>
+    <p class="muted">Pick the item and date you want to set a one-off quantity for.</p>
+    <div class="field"><label>Item</label><select id="f-item">${options}</select></div>
+    <div class="field"><label>Date</label><input id="f-date" type="date" value="${todayKey()}"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-primary" id="f-next">Next</button>
+    </div>
+  `;
+  overlay.classList.remove("hidden");
+  document.getElementById("f-cancel").onclick = closeModal;
+  document.getElementById("f-next").onclick = () => {
+    const itemId = document.getElementById("f-item").value;
+    const date = document.getElementById("f-date").value;
+    if(!date){ alert("Please pick a date."); return; }
+    const refresh = currentTab === "history" ? renderHistory : renderToday;
+    openQtyOverrideModal(itemId, date, refresh);
+  };
+}
+
+function openRecordPaymentModal(id){
+  const item = state.items.find(i=>i.id===id);
+  const balance = getBalance(item, todayKey());
+  modalBox.innerHTML = `
+    <h2>Record a payment — ${escapeHtml(item.name)}</h2>
+    <p class="muted">${balance > 0.004 ? `Currently ₹${balance.toFixed(2)} due.` : "No outstanding balance right now."} This can be any amount, for any date — it doesn't need to match a specific day's bill.</p>
+    <div class="field"><label>Amount paid (₹)</label><input id="f-amount" type="number" step="any" placeholder="e.g. 500" value="${balance > 0.004 ? balance.toFixed(2) : ''}"></div>
+    <div class="field"><label>Date</label><input id="f-date" type="date" value="${todayKey()}"></div>
+    <div class="field"><label>Note (optional)</label><input id="f-note" placeholder="e.g. Paid in cash"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="f-cancel">Cancel</button>
+      <button class="btn-primary" id="f-save">Save payment</button>
+    </div>
+  `;
+  overlay.classList.remove("hidden");
+  document.getElementById("f-cancel").onclick = closeModal;
+  document.getElementById("f-save").onclick = () => {
+    const amount = parseFloat(document.getElementById("f-amount").value);
+    const date = document.getElementById("f-date").value;
+    const note = document.getElementById("f-note").value.trim();
+    if(isNaN(amount) || amount <= 0){ alert("Enter a valid payment amount."); return; }
+    if(!date){ alert("Please pick a date."); return; }
+    addPayment(item, date, amount, note);
+    closeModal();
+    renderItems();
+    if(currentTab === "today") renderToday();
+  };
+}
+
+function openPaymentsListModal(id){
+  const item = state.items.find(i=>i.id===id);
+  const render = () => {
+    const payments = (item.payments||[]).slice().sort((a,b)=> a.date < b.date ? 1 : -1);
+    modalBox.innerHTML = `
+      <h2>Payments — ${escapeHtml(item.name)}</h2>
+      ${payments.length === 0 ? `<p class="muted">No payments recorded yet.</p>` : `
+        <div class="payments-list">
+          ${payments.map(p => `
+            <div class="payment-row">
+              <div>
+                <div class="payment-amt">₹${p.amount.toFixed(2)}</div>
+                <div class="muted">${p.date}${p.note ? " · " + escapeHtml(p.note) : ""}</div>
+              </div>
+              <button class="chip-btn danger" data-del="${p.id}">Delete</button>
+            </div>
+          `).join("")}
+        </div>
+      `}
+      <div class="modal-actions">
+        <button class="btn-cancel" id="f-close">Close</button>
+        <button class="btn-primary" id="f-add">+ Add payment</button>
+      </div>
+    `;
+    modalBox.querySelectorAll("[data-del]").forEach(btn=>{
+      btn.onclick = () => {
+        if(confirm("Delete this payment?")){
+          deletePayment(item, btn.dataset.del);
+          renderItems();
+          render();
+        }
+      };
+    });
+    document.getElementById("f-close").onclick = closeModal;
+    document.getElementById("f-add").onclick = () => openRecordPaymentModal(id);
+  };
+  overlay.classList.remove("hidden");
+  render();
+}
+
+/* ---------------- backup: export / import as JSON ---------------- */
+function exportJSON(){
+  const payload = {
+    app: "ghar-tracker",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: state
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ghar-tracker-backup-${todayKey()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function normalizeImportedState(raw){
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  return {
+    items: items.map(it => ({
+      id: it.id || makeId(),
+      name: it.name || "Item",
+      unit: it.unit || "unit",
+      icon: it.icon || ICONS[0],
+      qtyHistory: Array.isArray(it.qtyHistory) ? it.qtyHistory : [],
+      rateHistory: Array.isArray(it.rateHistory) ? it.rateHistory : [],
+      overrides: (it.overrides && typeof it.overrides === "object") ? it.overrides : {},
+      payments: Array.isArray(it.payments) ? it.payments : [],
+      createdAt: it.createdAt || todayKey()
+    }))
+  };
+}
+
+function importJSONFile(file){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(e.target.result);
+    } catch(err){
+      alert("That file doesn't look like valid JSON.");
+      return;
+    }
+    // Accept either the wrapped export format ({ data: {...} }) or a raw { items: [...] } object.
+    const raw = (parsed && typeof parsed === "object" && parsed.data) ? parsed.data : parsed;
+    if(!raw || !Array.isArray(raw.items)){
+      alert("That file doesn't look like a Ghar Tracker backup.");
+      return;
+    }
+    const count = raw.items.length;
+    const ok = confirm(`This will replace all current items and history on this device with the ${count} item${count===1?"":"s"} in this backup. This can't be undone — continue?`);
+    if(!ok) return;
+
+    state = normalizeImportedState(raw);
+    saveState();
+    renderItems();
+    if(currentTab === "today") renderToday();
+    if(currentTab === "history") renderHistory();
+    alert("Backup imported.");
+  };
+  reader.onerror = () => alert("Couldn't read that file.");
+  reader.readAsText(file);
+}
+
+document.getElementById("exportJsonBtn").onclick = exportJSON;
+document.getElementById("importJsonBtn").onclick = () => document.getElementById("importJsonInput").click();
+document.getElementById("importJsonInput").onchange = (e) => {
+  const file = e.target.files[0];
+  if(file) importJSONFile(file);
+  e.target.value = "";
+};
+
+/* ---------------- utils ---------------- */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+/* ---------------- nav wiring ---------------- */
+document.querySelectorAll(".nav-btn").forEach(btn=>{
+  btn.onclick = () => goTab(btn.dataset.tab);
+});
+
+/* ---------------- lock screen ---------------- */
+const lockScreen = document.getElementById("lockScreen");
+const appEl = document.getElementById("app");
+const lockInput = document.getElementById("lockInput");
+const lockBtn = document.getElementById("lockBtn");
+const lockTitle = document.getElementById("lockTitle");
+const lockSub = document.getElementById("lockSub");
+const lockError = document.getElementById("lockError");
+
+function hasPasscode(){ return !!localStorage.getItem(PASSCODE_KEY); }
+
+function setupLockScreen(){
+  if(!hasPasscode()){
+    lockTitle.textContent = "Set a passcode";
+    lockSub.textContent = "This just locks the app on this device — pick anything you'll remember.";
+    lockBtn.textContent = "Set passcode";
+  } else {
+    lockTitle.textContent = "Enter passcode";
+    lockSub.textContent = "Unlock your tracker";
+    lockBtn.textContent = "Unlock";
+  }
+  lockError.textContent = "";
+  lockInput.value = "";
+}
+
+function tryUnlock(){
+  const val = lockInput.value.trim();
+  if(!val){ lockError.textContent = "Please enter a passcode."; return; }
+  if(!hasPasscode()){
+    if(val.length < 4){ lockError.textContent = "Use at least 4 characters."; return; }
+    localStorage.setItem(PASSCODE_KEY, val);
+    unlockApp();
+    return;
+  }
+  if(val === localStorage.getItem(PASSCODE_KEY)){
+    unlockApp();
+  } else {
+    lockError.textContent = "Wrong passcode. Try again.";
+    lockInput.value = "";
+  }
+}
+function unlockApp(){
+  sessionStorage.setItem(SESSION_KEY, "1");
+  lockScreen.classList.add("hidden");
+  appEl.classList.remove("hidden");
+  goTab("today");
+}
+lockBtn.onclick = tryUnlock;
+lockInput.addEventListener("keydown", e => { if(e.key === "Enter") tryUnlock(); });
+
+document.getElementById("logoutBtn").onclick = () => {
+  sessionStorage.removeItem(SESSION_KEY);
+  appEl.classList.add("hidden");
+  lockScreen.classList.remove("hidden");
+  setupLockScreen();
+};
+
+/* ---------------- boot ---------------- */
+loadState();
+if(sessionStorage.getItem(SESSION_KEY) === "1"){
+  lockScreen.classList.add("hidden");
+  appEl.classList.remove("hidden");
+  goTab("today");
+} else {
+  setupLockScreen();
+}
+
+</script>
 </body>
 </html>
